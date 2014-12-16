@@ -15,4 +15,4 @@ out
 *.ipr
 *.iws
 *.class
-/.nb-gradle/private/
+.nb-gradle
