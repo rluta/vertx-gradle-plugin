@@ -15,245 +15,244 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.bundling.Zip
 
 public class VertxPlugin implements Plugin<Project> {
-  public void apply(Project project) {
-    applyPlugins project
-    applyExtensions project
-    addDependencies project
-    addTasks project
-  }
-
-  private void applyPlugins(Project project) {
-    project.with {
-      apply plugin: 'java'
-      apply plugin: 'watcher'
+    public void apply(Project project) {
+        applyPlugins project
+        applyExtensions project
+        addDependencies project
+        addTasks project
     }
-  }
 
-  private void addDependencies(Project project) {
-    project.with {
-      repositories { mavenCentral() }
-
-      configurations {
-        vertx
-        vertxcore
-        vertxlang
-        vertxtest
-        vertxincludes
-
-        vertx {
-          extendsFrom vertxcore
-          extendsFrom vertxlang
-          extendsFrom vertxtest
-          extendsFrom vertxincludes
+    private void applyPlugins(Project project) {
+        project.with {
+            apply plugin: 'java'
+            apply plugin: 'watcher'
         }
+    }
 
-        provided.extendsFrom vertx
-        compile.extendsFrom provided
-      }
+    private void addDependencies(Project project) {
+        project.with {
+            repositories { mavenCentral() }
 
-      afterEvaluate {
-        // validations
-        if (vertx?.platform?.version == null) {
-          println('Vert.x Platform Version not set. e.g. "vertx.platform.version = \'2.1\'".')
-        } else {
-          def vertxGroup = 'io.vertx'
+            configurations.create('vertx')
+            configurations.create('vertxcore')
+            configurations.create('vertxlang')
+            configurations.create('vertxtest')
+            configurations.create('vertxincludes')
 
-          dependencies {
-            // core and lang modules
-            vertxcore("${vertxGroup}:vertx-platform:${vertx.platform.version}")
-
-            if (vertx.platform.lang != null) {
-              def module = getModuleForLang(project, vertx.platform.lang)
-              if (!module) {
-                println("Unsupported Language: ${vertx.platform.lang}")
-              } else {
-                vertxlang(module)
-              }
+            configurations.vertx {
+                extendsFrom(configurations.vertxcore)
+                extendsFrom(configurations.vertxlang)
+                extendsFrom(configurations.vertxtest)
+                extendsFrom(configurations.vertxincludes)
             }
 
-            if (vertx.platform.toolsVersion) {
-              vertxtest("${vertxGroup}:testtools:${vertx.platform.toolsVersion}")
+            configurations {
+                provided.extendsFrom vertx
+                compile.extendsFrom provided
             }
 
-            // includes
-            vertx.config?.map?.includes?.collect { String dep ->
-              dep.replace('~', ':')
-            }.each { dep -> vertxincludes dep }
-          }
+            afterEvaluate {
+                // validations
+                if (vertx?.platform?.version == null) {
+                    println('Vert.x Platform Version not set. e.g. "vertx.platform.version = \'2.1\'".')
+                } else {
+                    def vertxGroup = 'io.vertx'
+
+                    dependencies {
+                        // core and lang modules
+                        vertxcore("${vertxGroup}:vertx-platform:${vertx.platform.version}")
+
+                        if (vertx.platform.lang != null) {
+                            def module = getModuleForLang(project, vertx.platform.lang)
+                            if (!module) {
+                                println("Unsupported Language: ${vertx.platform.lang}")
+                            } else {
+                                vertxlang(module)
+                            }
+                        }
+
+                        if (vertx.platform.toolsVersion) {
+                            vertxtest("${vertxGroup}:testtools:${vertx.platform.toolsVersion}")
+                        }
+
+                        // includes
+                        vertx.config?.map?.includes?.collect { String dep ->
+                            dep.replace('~', ':')
+                        }.each { dep -> vertxincludes dep }
+                    }
+                }
+            }
         }
-      }
-    }
-  }
-
-  private String getModuleForLang(Project project, String lang) {
-    // load langs.properties and get the correct version if a version was not specified
-    def cp = (project.configurations.vertxcore.files + project.file('conf'))
-      .collect({ file ->
-      // File.toURL() is bugged. Use toURI().toURL(). See Javadoc
-      file.toURI().toURL()
-    }).toArray(new URL[0])
-
-    def cl = new URLClassLoader(cp)
-
-    def props = new Properties()
-
-    [
-      'default-langs.properties',
-      'langs.properties'
-    ].each { file ->
-      cl.getResourceAsStream(file)?.withReader { r ->
-        props.load(r)
-      }
     }
 
-    // vertx modules are defined in a different format.
-    def module = props.getProperty(lang)?.split(":", -1)?.getAt(0)?.replace('~', ':')
-    return module
-  }
+    private String getModuleForLang(Project project, String lang) {
+        // load langs.properties and get the correct version if a version was not specified
+        def cp = (project.configurations.vertxcore.files + project.file('conf'))
+                .collect({ file ->
+            // File.toURL() is bugged. Use toURI().toURL(). See Javadoc
+            file.toURI().toURL()
+        }).toArray(new URL[0])
 
-  private void applyExtensions(Project project) {
-    project.extensions.create 'vertx', ProjectConfiguration, project
+        def cl = new URLClassLoader(cp)
 
-    project.vertx.extensions.create 'platform', PlatformConfiguration, project
-    project.vertx.extensions.create 'config', ModuleConfiguration, project
-    project.vertx.extensions.deployments = project.container Deployment.class
-  }
+        def props = new Properties()
+        [
+                'default-langs.properties',
+                'langs.properties'
+        ].each { file ->
+            cl.getResourceAsStream(file)?.withReader { r ->
+                props.load(r)
+            }
+        }
 
-  private void addTasks(Project project) {
-    addArchiveTasks project
-    addRunTasks project
-  }
+        // vertx modules are defined in a different format.
+        def module = props.getProperty(lang)?.split(":", -1)?.getAt(0)?.replace('~', ':')
+        return module
+    }
 
-  private void addArchiveTasks(Project project) {
-    project.with {
-      // archive tasks
-      task('generateModJson', type: GenerateModJson) {}
-      task('assembleVertx', type: Sync) {
-      }
+    private void applyExtensions(Project project) {
+        project.extensions.create 'vertx', ProjectConfiguration, project
 
-      task("dummyAutoRedeployableMod") {
-        doLast {
-          def modDir = project.vertx.moduleDir
-          modDir.mkdirs()
+        project.vertx.extensions.create 'platform', PlatformConfiguration, project
+        project.vertx.extensions.create 'config', ModuleConfiguration, project
+        project.vertx.extensions.deployments = project.container Deployment.class
+    }
 
-          project.file("$modDir/mod.json").withWriter { writer ->
-            writer << '{"main":"Main.java","auto-redeploy":true}'
-          }
+    private void addTasks(Project project) {
+        addArchiveTasks project
+        addRunTasks project
+    }
 
-          project.file("$modDir/Main.java").withWriter { writer ->
-            writer << '''\
+    private void addArchiveTasks(Project project) {
+        project.with {
+            // archive tasks
+            task('generateModJson', type: GenerateModJson) {}
+            task('assembleVertx', type: Sync) {
+            }
+
+            task("dummyAutoRedeployableMod") {
+                doLast {
+                    def modDir = project.vertx.moduleDir
+                    modDir.mkdirs()
+
+                    project.file("$modDir/mod.json").withWriter { writer ->
+                        writer << '{"main":"Main.java","auto-redeploy":true}'
+                    }
+
+                    project.file("$modDir/Main.java").withWriter { writer ->
+                        writer << '''\
 import org.vertx.java.platform.Verticle;
 public class Main extends Verticle {}\
             '''
-          }
-        }
-      }
-
-      task('copyMod', type: Sync) {
-        into { project.vertx.moduleDir }
-        from assembleVertx
-      }
-
-      task('modZip', type: Zip) {
-        group = 'Vertx'
-        classifier = 'mod'
-        from assembleVertx
-      }
-
-      afterEvaluate {
-        def group = vertx.info.groupId || project.group
-        def name = vertx.info.artifactId || project.name
-        def version = vertx.info.version || project.version
-
-        ext.archivesBaseName = name
-        assembleVertx {
-          def sourceSets = sourceSets.matching({ it.name != SourceSet.TEST_SOURCE_SET_NAME })
-
-          into "$buildDir/mod"
-          from sourceSets*.output
-          from generateModJson
-
-          into('lib') {
-            from configurations.compile - configurations.provided
-          }
-
-          dependsOn generateModJson
-          dependsOn sourceSets*.classesTaskName
-        }
-      }
-    }
-  }
-
-  private void addRunTasks(Project project) {
-    project.with {
-      // create the watcher task
-      def watcherTask = task('__watch', type: WatcherTask) {
-        // flags
-        block = false
-        runImmediately = true
-
-        includes = ['src/**']
-        tasks = ['copyMod']
-      }
-
-      // configure the run/debug tasks
-      vertx.deployments.whenObjectAdded { Deployment dep ->
-        // add tasks for deployment
-        def name = dep.name.capitalize()
-
-        def configTask = task("generate${name}Config", type: GenerateDeploymentConfig) {
-          deployment = dep
-        }
-
-        def runTask = task("run$name", type: RunVertx) {
-          debug = false
-        }
-        def debugTask = task("debug$name", type: RunVertx) {
-          debug = true
-        }
-
-        [runTask, debugTask]*.configure {
-          deployment dep
-          configFile { configTask.outputFile }
-
-          dependsOn configTask
-        }
-
-        afterEvaluate {
-          // make this project the default module target if it was not specified
-          def module = dep.deploy?.module ?: project
-
-          if (module instanceof Project) {
-            if (module.vertx.config.map.'auto-redeploy') {
-              runTask.dependsOn module.dummyAutoRedeployableMod, watcherTask
-              debugTask.dependsOn module.dummyAutoRedeployableMod, watcherTask
-            } else {
-              runTask.dependsOn module.tasks.copyMod
-              debugTask.dependsOn module.tasks.copyMod
+                    }
+                }
             }
-          } else {
-            // since this is an external module I don't see a use case where you would want to
-            // debug the module
-            debugTask.enabled = false
-          }
 
-          if (!dep.platform.version) {
-            dep.platform.version = vertx.platform.version
-          }
+            task('copyMod', type: Sync) {
+                into { project.vertx.moduleDir }
+                from assembleVertx
+            }
+
+            task('modZip', type: Zip) {
+                group = 'Vertx'
+                classifier = 'mod'
+                from assembleVertx
+            }
+
+            afterEvaluate {
+                def group = vertx.info.groupId || project.group
+                def name = vertx.info.artifactId || project.name
+                def version = vertx.info.version || project.version
+
+                ext.archivesBaseName = name
+                assembleVertx {
+                    def sourceSets = sourceSets.matching({ it.name != SourceSet.TEST_SOURCE_SET_NAME })
+
+                    into "$buildDir/mod"
+                    from sourceSets*.output
+                    from generateModJson
+
+                    into('lib') {
+                        from configurations.compile - configurations.provided
+                    }
+
+                    dependsOn generateModJson
+                    dependsOn sourceSets*.classesTaskName
+                }
+            }
         }
-      }
-
-      vertx.deployments.whenObjectRemoved { Deployment dep ->
-        def name = dep.name.capitalize()
-        tasks.removeAll tasks."run$name", tasks."debug$name"
-      }
-
-      vertx.deployments {
-        mod {
-          deploy project
-        }
-      }
     }
-  }
+
+    private void addRunTasks(Project project) {
+        project.with {
+            // create the watcher task
+            def watcherTask = task('__watch', type: WatcherTask) {
+                // flags
+                block = false
+                runImmediately = true
+
+                includes = ['src/**']
+                tasks = ['copyMod']
+            }
+
+            // configure the run/debug tasks
+            vertx.deployments.whenObjectAdded { Deployment dep ->
+                // add tasks for deployment
+                def name = dep.name.capitalize()
+
+                def configTask = task("generate${name}Config", type: GenerateDeploymentConfig) {
+                    deployment = dep
+                }
+
+                def runTask = task("run$name", type: RunVertx) {
+                    debug = false
+                }
+                def debugTask = task("debug$name", type: RunVertx) {
+                    debug = true
+                }
+
+                [runTask, debugTask]*.configure {
+                    deployment dep
+                    configFile { configTask.outputFile }
+
+                    dependsOn configTask
+                }
+
+                afterEvaluate {
+                    // make this project the default module target if it was not specified
+                    def module = dep.deploy?.module ?: project
+
+                    if (module instanceof Project) {
+                        if (module.vertx.config.map.'auto-redeploy') {
+                            runTask.dependsOn module.dummyAutoRedeployableMod, watcherTask
+                            debugTask.dependsOn module.dummyAutoRedeployableMod, watcherTask
+                        } else {
+                            runTask.dependsOn module.tasks.copyMod
+                            debugTask.dependsOn module.tasks.copyMod
+                        }
+                    } else {
+                        // since this is an external module I don't see a use case where you would want to
+                        // debug the module
+                        debugTask.enabled = false
+                    }
+
+                    if (!dep.platform.version) {
+                        dep.platform.version = vertx.platform.version
+                    }
+                }
+            }
+
+            vertx.deployments.whenObjectRemoved { Deployment dep ->
+                def name = dep.name.capitalize()
+                tasks.removeAll tasks."run$name", tasks."debug$name"
+            }
+
+            vertx.deployments {
+                mod {
+                    deploy project
+                }
+            }
+        }
+    }
 
 }

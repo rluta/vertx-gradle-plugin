@@ -1,56 +1,59 @@
 repositories {
-  mavenCentral()
-  mavenLocal()
+    mavenCentral()
+    mavenLocal()
 }
 
 configurations {
-  provided
+    provided
 
-  compile.extendsFrom provided
+    compile.extendsFrom provided
 }
 
 group = 'com.darylteo.vertx'
-version = '0.1.3'
+version = '0.1.4-SNAPSHOT'
 
 apply plugin: 'groovy'
 apply from: rootProject.file('gradle/sonatype.gradle')
 
 dependencies {
-  compile localGroovy()
-  compile 'com.darylteo.gradle:gradle-watcher:0.1.2'
+    compile localGroovy()
+    compile 'com.darylteo.gradle:gradle-watcher:0.1.3'
 
-  provided gradleApi()
+    provided gradleApi()
 }
 
 uploadArchives {
-  repositories {
-    mavenDeployer {
-      pom {
-        project {
-          name 'Vert.x Gradle Plugin'
-          description 'A Gradle Plugin for building, assembling and running Vert.x projects.'
-          inceptionYear '2013'
-          url 'http://github.com/darylteo/vertx-gradle-plugin'
-
-          developers {
-            developer {
-              id 'darylteo'
-              name 'Daryl Teo'
-              email 'i.am@darylteo.com'
+    repositories {
+        mavenDeployer {
+            repository(url:'http://maven.adm.tv.sfr.net/artifactory/vertx') {
+                authentication(userName: sfrUsername, password: sfrPassword)
             }
-          }
+            pom {
+                project {
+                    name 'Vert.x Gradle Plugin'
+                    description 'A Gradle Plugin for building, assembling and running Vert.x projects.'
+                    inceptionYear '2013'
+                    url 'http://github.com/darylteo/vertx-gradle-plugin'
 
-          scm { url 'http://github.com/darylteo/vertx-gradle-plugin' }
+                    developers {
+                        developer {
+                            id 'darylteo'
+                            name 'Daryl Teo'
+                            email 'i.am@darylteo.com'
+                        }
+                    }
 
-          licenses {
-            license {
-              name 'The Apache Software License, Version 2.0'
-              url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-              distribution 'repo'
+                    scm { url 'http://github.com/darylteo/vertx-gradle-plugin' }
+
+                    licenses {
+                        license {
+                            name 'The Apache Software License, Version 2.0'
+                            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                            distribution 'repo'
+                        }
+                    }
+                }
             }
-          }
         }
-      }
     }
-  }
 }
